@@ -28,7 +28,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var bluetoothAdapter: BluetoothAdapter
     private val viewModel: BluetoothDeviceViewModel by viewModels()
-    private var listDevice = mutableListOf<BluetoothDevice>()
+    private var listDeviceConnected = mutableSetOf<BluetoothDevice>()
+    private var listDeviceUnConnected = mutableListOf<BluetoothDevice>()
 
     private val enableBluetoothLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -60,15 +61,28 @@ class MainActivity : AppCompatActivity() {
         binding.btnConnect.setOnClickListener {
             checkPermissionsAndEnableBluetooth()
         }
-        viewModel.devices.observe(this) { devices ->
-            (binding.rvDevice.adapter as BluetoothDeviceAdapter).updateDevice(devices)
-            Log.e("Device", devices.size.toString())
+        viewModel.devicesUnConnected.observe(this) { devices ->
+            (binding.rvDeviceUnConnected.adapter as BluetoothDeviceUnConnectedAdapter).updateDevice(devices)
+        }
+        viewModel.devicesConnected.observe(this) { devices ->
+            (binding.rvDeviceConnected.adapter as BluetoothDeviceConnectedAdapter).updateDevice(devices.toMutableList())
         }
     }
 
     private fun setupRecyclerView() {
-        binding.rvDevice.apply {
-            adapter = BluetoothDeviceAdapter(mutableListOf())
+        binding.rvDeviceUnConnected.apply {
+            adapter = BluetoothDeviceUnConnectedAdapter(mutableListOf())
+            layoutManager = LinearLayoutManager(this@MainActivity)
+            addItemDecoration(
+                DividerItemDecoration(
+                    this@MainActivity,
+                    DividerItemDecoration.VERTICAL
+                )
+            )
+        }
+
+        binding.rvDeviceConnected.apply {
+            adapter = BluetoothDeviceConnectedAdapter(mutableListOf())
             layoutManager = LinearLayoutManager(this@MainActivity)
             addItemDecoration(
                 DividerItemDecoration(
@@ -88,11 +102,10 @@ class MainActivity : AppCompatActivity() {
                         intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
                     device?.let {
                         val deviceAddress = it.address
-                        val isDeviceAlreadyAdded = listDevice.any { device -> device.address == deviceAddress }
-
+                        val isDeviceAlreadyAdded = listDeviceUnConnected.any { device -> device.address == deviceAddress }
                         if (!isDeviceAlreadyAdded) {
-                            listDevice.add(it)
-                            viewModel.addDevice(listDevice)
+                            listDeviceUnConnected.add(it)
+                            viewModel.addDeviceUnConnected(listDeviceUnConnected)
                         }
                     }
                 }
@@ -111,6 +124,9 @@ class MainActivity : AppCompatActivity() {
             bluetoothAdapter.cancelDiscovery()
         }
         bluetoothAdapter.startDiscovery()
+
+        listDeviceConnected = bluetoothAdapter.bondedDevices
+        viewModel.addDeviceConnected(listDeviceConnected)
     }
 
     private fun checkPermissionsAndEnableBluetooth() {
