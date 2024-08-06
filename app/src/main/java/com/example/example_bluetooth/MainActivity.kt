@@ -6,6 +6,7 @@ import android.app.Activity
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothSocket
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -23,14 +24,17 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.example_bluetooth.databinding.ActivityMainBinding
+import java.io.IOException
+import java.util.UUID
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), OnClick {
     private lateinit var binding: ActivityMainBinding
     private lateinit var bluetoothAdapter: BluetoothAdapter
     private val viewModel: BluetoothDeviceViewModel by viewModels()
     private var listDeviceConnected = mutableSetOf<BluetoothDevice>()
     private var listDeviceUnConnected = mutableListOf<BluetoothDevice>()
-
+    private var bluetoothSocket: BluetoothSocket? = null
+    private val MYUUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
     private val enableBluetoothLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == Activity.RESULT_OK) {
@@ -71,7 +75,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupRecyclerView() {
         binding.rvDeviceUnConnected.apply {
-            adapter = BluetoothDeviceUnConnectedAdapter(mutableListOf())
+            adapter = BluetoothDeviceUnConnectedAdapter(mutableListOf(), this@MainActivity)
             layoutManager = LinearLayoutManager(this@MainActivity)
             addItemDecoration(
                 DividerItemDecoration(
@@ -82,7 +86,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.rvDeviceConnected.apply {
-            adapter = BluetoothDeviceConnectedAdapter(mutableListOf())
+            adapter = BluetoothDeviceConnectedAdapter(mutableListOf(), this@MainActivity)
             layoutManager = LinearLayoutManager(this@MainActivity)
             addItemDecoration(
                 DividerItemDecoration(
@@ -162,6 +166,63 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    @SuppressLint("MissingPermission")
+    override fun onClickUnConnected(pos: Int) {
+        pairDevice(listDeviceUnConnected[pos])
+        connectDevice(listDeviceUnConnected[pos])
+        Toast.makeText(this, listDeviceUnConnected[pos].name, Toast.LENGTH_SHORT).show()
+    }
+
+    @SuppressLint("MissingPermission")
+    override fun onClickConnected(pos: Int) {
+        connectDevice(listDeviceConnected.toMutableList()[pos])
+        Toast.makeText(this, listDeviceConnected.toMutableList()[pos].name, Toast.LENGTH_SHORT)
+            .show()
+    }
+
+    private fun pairDevice(device: BluetoothDevice) {
+        try {
+            val method = device.javaClass.getMethod("createBond")
+            method.invoke(device)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun connectDevice(device: BluetoothDevice) {
+        try {
+            bluetoothSocket = device.createRfcommSocketToServiceRecord(MYUUID)
+            this.bluetoothSocket?.connect()
+            Toast.makeText(this, "Kết nối thành công !!", Toast.LENGTH_SHORT).show()
+            sendData("Hello, Bluetooth Device!")
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(this, "Kết nối thất bại !!", Toast.LENGTH_SHORT).show()
+            Log.e("TAG", e.toString())
+            try {
+                bluetoothSocket?.close()
+            } catch (closeE: Exception) {
+                closeE.printStackTrace()
+            }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun sendData(data: String) {
+        try {
+            val outputStream = bluetoothSocket?.outputStream
+            if (outputStream != null) {
+                outputStream.write(data.toByteArray())
+                Toast.makeText(this, "Dữ liệu đã được gửi", Toast.LENGTH_SHORT).show()
+            } else {
+                Log.e("Bluetooth", "Output stream is null")
+            }
+        } catch (e: IOException) {
+            Log.e("Bluetooth", "Error sending data", e)
+            Toast.makeText(this, "Gửi dữ liệu thất bại", Toast.LENGTH_SHORT).show()
+        }
+    }
     override fun onDestroy() {
         super.onDestroy()
         unregisterReceiver(receiver)

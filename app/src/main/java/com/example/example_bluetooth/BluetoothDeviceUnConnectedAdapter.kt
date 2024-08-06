@@ -7,7 +7,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.example.example_bluetooth.databinding.LayoutItemBluetoothDeviceBinding
 
-class BluetoothDeviceUnConnectedAdapter(private var listDevice: MutableList<BluetoothDevice>) : RecyclerView.Adapter<BluetoothDeviceUnConnectedAdapter.ViewHolder>() {
+class BluetoothDeviceUnConnectedAdapter(private var listDevice: MutableList<BluetoothDevice>, private val onClick: OnClick) : RecyclerView.Adapter<BluetoothDeviceUnConnectedAdapter.ViewHolder>() {
 
     inner class ViewHolder(val binding: LayoutItemBluetoothDeviceBinding) :
         RecyclerView.ViewHolder(binding.root) {}
@@ -25,6 +25,9 @@ class BluetoothDeviceUnConnectedAdapter(private var listDevice: MutableList<Blue
         holder.itemView.apply {
             holder.binding.deviceName.text = listDevice[position].name
             holder.binding.deviceAddress.text = listDevice[position].address
+        }
+        holder.itemView.setOnClickListener {
+            onClick.onClickUnConnected(position)
         }
     }
 
